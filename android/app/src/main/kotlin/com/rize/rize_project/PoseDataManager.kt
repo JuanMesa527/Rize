@@ -14,11 +14,6 @@ object PoseDataManager : EventChannel.StreamHandler {
     }
 
     fun sendPoseData(data: List<Double>) {
-        // Must be run on main thread
-        // We can ensure this or use Handler(Looper.getMainLooper()).post { ... }
-        // But EventChannel usually handles this if called from main thread.
-        // If called from background, we need to switch.
-        // Assuming we will switch to main thread before calling this or inside this.
         val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
         mainHandler.post {
             eventSink?.success(data)

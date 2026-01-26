@@ -26,7 +26,7 @@ class CameraView(
 
     private val frameLayout: FrameLayout = FrameLayout(context)
     private val previewView: PreviewView = PreviewView(context)
-    private val overlayView: OverlayView = OverlayView(context) // Vista de Overlay
+    private val overlayView: OverlayView = OverlayView(context)
     private var cameraProvider: ProcessCameraProvider? = null
     private var imageAnalyzer: ImageAnalysis? = null
     private var preview: Preview? = null
@@ -38,16 +38,16 @@ class CameraView(
     init {
         frameLayout.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
 
-        // Preview View Setup
+
         previewView.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
         previewView.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-        previewView.scaleType = PreviewView.ScaleType.FILL_START // Volver a FILL para coincidir con OverlayView logic
+        previewView.scaleType = PreviewView.ScaleType.FILL_START
 
-        // Overlay View Setup
+
         overlayView.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
 
         frameLayout.addView(previewView)
-        frameLayout.addView(overlayView) // Agregar overlay encima de preview
+        frameLayout.addView(overlayView)
 
         setupMediaPipe()
 
@@ -91,7 +91,7 @@ class CameraView(
                 it.setAnalyzer(backgroundExecutor) { image ->
                     poseLandmarkerHelper.detectLiveStream(
                         imageProxy = image,
-                        isFrontCamera = true // Assuming front camera
+                        isFrontCamera = true
                     )
                 }
             }
@@ -99,9 +99,6 @@ class CameraView(
         cameraProvider.unbindAll()
 
         try {
-            // Must unbind the use-cases before rebinding them
-           // cameraProvider.unbindAll()
-
             cameraInput = cameraProvider.bindToLifecycle(
                 lifecycleOwner,
                 cameraSelector,
@@ -129,7 +126,6 @@ class CameraView(
     }
 
     override fun onResults(resultBundle: ResultBundle) {
-        // Ejecutar en Main Thread para actualizar UI (Overlay)
         ContextCompat.getMainExecutor(context).execute {
             overlayView.setResults(
                 resultBundle.results.first(),
@@ -143,7 +139,6 @@ class CameraView(
         if (results.isNotEmpty()) {
             val firstResult = results[0]
             val landmarks = firstResult.landmarks()
-            // landmarks is a list of list of normalized landmarks (one list per person)
 
             if (landmarks.isNotEmpty()) {
                 val personLandmarks = landmarks[0]

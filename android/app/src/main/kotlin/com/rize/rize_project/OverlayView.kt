@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.util.AttributeSet
+import android.util.Log
 import android.view.View
 import androidx.core.content.ContextCompat
 import com.google.mediapipe.tasks.vision.core.RunningMode
@@ -23,6 +24,8 @@ class OverlayView(context: Context?, attrs: AttributeSet? = null) :
     private var scaleFactor: Float = 1f
     private var imageWidth: Int = 1
     private var imageHeight: Int = 1
+    private var offsetX: Float = 0f
+    private var offsetY: Float = 0f
 
     init {
         initPaints()
@@ -37,33 +40,44 @@ class OverlayView(context: Context?, attrs: AttributeSet? = null) :
     }
 
     private fun initPaints() {
-        linePaint.color = Color.GREEN // Usando color estándar
+        linePaint.color = Color.RED
         linePaint.strokeWidth = LANDMARK_STROKE_WIDTH
         linePaint.style = Paint.Style.STROKE
 
         pointPaint.color = Color.YELLOW
-        pointPaint.strokeWidth = LANDMARK_STROKE_WIDTH
+        pointPaint.strokeWidth = LANDMARK_STROKE_WIDTH * 3  // Triplicar tamaño para mejor visibilidad
         pointPaint.style = Paint.Style.FILL
+
+        Log.d("OverlayView", "Paints inicializados - linePaint: RED, pointPaint: YELLOW")
     }
 
-    override fun draw(canvas: Canvas) {
-        super.draw(canvas)
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+
+        if (results == null) {
+            return
+        }
+
+        // Log solo cada 10 frames para no saturar logcat
+        if ((System.currentTimeMillis() / 100) % 10 == 0L) {
+            Log.d("OverlayView", "✓ Redibujando - scaleFactor: $scaleFactor, canvas: ${width}x${height}")
+        }
+
         results?.let { poseLandmarkerResult ->
             for(landmark in poseLandmarkerResult.landmarks()) {
-                for(normalizedLandmark in landmark) {
-                    canvas.drawPoint(
-                        normalizedLandmark.x() * imageWidth * scaleFactor,
-                        normalizedLandmark.y() * imageHeight * scaleFactor,
-                        pointPaint
-                    )
+                for((index, normalizedLandmark) in landmark.withIndex()) {
+                    val x = normalizedLandmark.x() * imageWidth * scaleFactor + offsetX
+                    val y = normalizedLandmark.y() * imageHeight * scaleFactor + offsetY
+
+                    canvas.drawPoint(x, y, pointPaint)
                 }
 
                 PoseLandmarker.POSE_LANDMARKS.forEach {
                     canvas.drawLine(
-                        poseLandmarkerResult.landmarks().get(0).get(it!!.start()).x() * imageWidth * scaleFactor,
-                        poseLandmarkerResult.landmarks().get(0).get(it.start()).y() * imageHeight * scaleFactor,
-                        poseLandmarkerResult.landmarks().get(0).get(it.end()).x() * imageWidth * scaleFactor,
-                        poseLandmarkerResult.landmarks().get(0).get(it.end()).y() * imageHeight * scaleFactor,
+                        poseLandmarkerResult.landmarks().get(0).get(it!!.start()).x() * imageWidth * scaleFactor + offsetX,
+                        poseLandmarkerResult.landmarks().get(0).get(it.start()).y() * imageHeight * scaleFactor + offsetY,
+                        poseLandmarkerResult.landmarks().get(0).get(it.end()).x() * imageWidth * scaleFactor + offsetX,
+                        poseLandmarkerResult.landmarks().get(0).get(it.end()).y() * imageHeight * scaleFactor + offsetY,
                         linePaint)
                 }
             }
@@ -81,22 +95,29 @@ class OverlayView(context: Context?, attrs: AttributeSet? = null) :
         this.imageHeight = imageHeight
         this.imageWidth = imageWidth
 
-        scaleFactor = when (runningMode) {
+        // Calcular scaleFactor y offsets según el modo
+        when (runningMode) {
             RunningMode.IMAGE,
             RunningMode.VIDEO -> {
-                min(width * 1f / imageWidth, height * 1f / imageHeight)
+                // Para VIDEO: el overlay tiene el MISMO tamaño que el video visible
+                // Por lo tanto, NO necesitamos calcular offsets, solo escalar directamente
+                scaleFactor = width.toFloat() / imageWidth.toFloat()
+                offsetX = 0f
+                offsetY = 0f
+
+                Log.d("OverlayView", "VIDEO mode - Direct scale: $scaleFactor, overlay: ${width}x${height}, image: ${imageWidth}x${imageHeight}")
             }
             RunningMode.LIVE_STREAM -> {
-                // PreviewView is in FILL_START mode. So we need to scale up the
-                // landmarks to match with the size that the captured images will be
-                // displayed.
-                max(width * 1f / imageWidth, height * 1f / imageHeight)
+                // Para LIVE_STREAM usar max (comportamiento original)
+                scaleFactor = max(width * 1f / imageWidth, height * 1f / imageHeight)
+                offsetX = 0f
+                offsetY = 0f
             }
         }
         invalidate()
     }
 
     companion object {
-        private const val LANDMARK_STROKE_WIDTH = 8F // Ajustado un poco más fino
+        private const val LANDMARK_STROKE_WIDTH = 8F
     }
 }

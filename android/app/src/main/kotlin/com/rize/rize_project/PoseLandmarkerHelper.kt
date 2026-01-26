@@ -37,10 +37,9 @@ class PoseLandmarkerHelper(
     }
 
     fun setupPoseLandmarker() {
-        // Set the general pose landmarker options
         val baseOptionsBuilder = BaseOptions.builder()
 
-        // Use the specified hardware for running the model. Default to CPU
+
         when (currentDelegate) {
             DELEGATE_CPU -> {
                 baseOptionsBuilder.setDelegate(Delegate.CPU)
@@ -62,7 +61,6 @@ class PoseLandmarkerHelper(
                     .setMinPosePresenceConfidence(minPosePresenceConfidence)
                     .setRunningMode(runningMode)
 
-            // The ResultListener and ErrorListener are only used for LIVE_STREAM mode.
             if (runningMode == RunningMode.LIVE_STREAM) {
                 optionsBuilder
                     .setResultListener(this::returnLivestreamResult)
@@ -95,7 +93,7 @@ class PoseLandmarkerHelper(
         }
         val frameTime = SystemClock.uptimeMillis()
 
-        // Copy out RGB bits from the frame to a bitmap buffer
+
         val bitmapBuffer =
             Bitmap.createBitmap(
                 imageProxy.width,
@@ -106,10 +104,10 @@ class PoseLandmarkerHelper(
         imageProxy.close()
 
         val matrix = Matrix().apply {
-            // Rotate the frame received from the camera to be in the same direction as it'll be shown
+
             postRotate(imageProxy.imageInfo.rotationDegrees.toFloat())
 
-            // flip image if user use front camera
+
             if (isFrontCamera) {
                 postScale(
                     -1f,
@@ -125,7 +123,7 @@ class PoseLandmarkerHelper(
             matrix, true
         )
 
-        // Convert the input Bitmap object to an MPImage object to run inference
+
         val mpImage = BitmapImageBuilder(rotatedBitmap).build()
 
         detectAsync(mpImage, frameTime)
@@ -134,6 +132,39 @@ class PoseLandmarkerHelper(
     @VisibleForTesting
     fun detectAsync(mpImage: MPImage, frameTime: Long) {
         poseLandmarker?.detectAsync(mpImage, frameTime)
+    }
+
+    fun detectVideoFrame(
+        bitmap: Bitmap,
+        frameTimestampMs: Long
+    ) {
+        if (runningMode != RunningMode.VIDEO) {
+            throw IllegalArgumentException(
+                "Attempting to call detectVideoFrame while not using RunningMode.VIDEO"
+            )
+        }
+
+        try {
+            val mpImage = BitmapImageBuilder(bitmap).build()
+            val result = poseLandmarker?.detectForVideo(mpImage, frameTimestampMs)
+
+            result?.let {
+                val inferenceTime = SystemClock.uptimeMillis() - frameTimestampMs
+                poseLandmarkerHelperListener?.onResults(
+                    ResultBundle(
+                        listOf(it),
+                        inferenceTime,
+                        mpImage.height,
+                        mpImage.width
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error detecting video frame: ${e.message}")
+            poseLandmarkerHelperListener?.onError(
+                e.message ?: "Error detecting video frame"
+            )
+        }
     }
 
     private fun returnLivestreamResult(
