@@ -11,8 +11,8 @@ class PoseDetectorView extends StatefulWidget {
 }
 
 class _PoseDetectorViewState extends State<PoseDetectorView> {
-  // El canal debe coincidir exactamente con el nombre definido en MainActivity.kt
   static const EventChannel _channel = EventChannel('com.rize.rize/pose_data');
+  static const MethodChannel _methodChannel = MethodChannel('com.rize.rize/camera_control');
 
   List<double> _currentLandmarks = [];
   StreamSubscription? _subscription;
@@ -29,14 +29,12 @@ class _PoseDetectorViewState extends State<PoseDetectorView> {
       (dynamic event) {
         if (mounted) {
           setState(() {
-            // Convertimos la lista dinámica a lista de doubles
             // Formato esperado: [x, y, z, visibility, x, y, z, visibility, ...]
             final List<dynamic> rawList = event as List<dynamic>;
             _currentLandmarks = rawList.map((e) => (e as num).toDouble()).toList();
             _frameCount++;
 
-            // Debug log cada 30 cuadros para no saturar la consola
-            if (_frameCount % 30 == 0) {
+            if (_frameCount % 10 == 0) {
               debugPrint("Android -> Flutter: Recibidos ${_currentLandmarks.length} valores.");
             }
           });
@@ -46,6 +44,15 @@ class _PoseDetectorViewState extends State<PoseDetectorView> {
         debugPrint('Error en el stream de poses: $error');
       },
     );
+  }
+
+  Future<void> _switchCamera() async {
+    try {
+      await _methodChannel.invokeMethod('switchCamera');
+      debugPrint('Solicitud de cambio de cámara enviada.');
+    } on PlatformException catch (e) {
+      debugPrint("Error al cambiar de cámara: '${e.message}'.");
+    }
   }
 
   @override
@@ -80,16 +87,23 @@ class _PoseDetectorViewState extends State<PoseDetectorView> {
                   ),
           ),
 
-          // 2. Capa de Dibujo (Landmarks)
-          // ELIMINADO: El dibujado ahora es nativo en Android (OverlayView) para mayor eficiencia y sincronización.
-
-          // 3. Botón para volver
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
-              child: BackButton(
-                color: Colors.white,
-                onPressed: () => Navigator.pop(context),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Botón Atrás
+                  BackButton(
+                    color: Colors.white,
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  // Botón Cambiar Cámara
+                  IconButton(
+                    icon: const Icon(Icons.cameraswitch, color: Colors.white, size: 30),
+                    onPressed: _switchCamera,
+                  ),
+                ],
               ),
             ),
           ),

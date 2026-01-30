@@ -37,26 +37,20 @@ class OverlayView(context: Context?, attrs: AttributeSet? = null) :
     }
 
     private fun initPaints() {
-        linePaint.color = Color.GREEN // Usando color estándar
-        linePaint.strokeWidth = LANDMARK_STROKE_WIDTH
+        linePaint.color = Color.GREEN
+        linePaint.strokeWidth = 12F
         linePaint.style = Paint.Style.STROKE
 
         pointPaint.color = Color.YELLOW
-        pointPaint.strokeWidth = LANDMARK_STROKE_WIDTH
+        pointPaint.strokeWidth = 25F
         pointPaint.style = Paint.Style.FILL
+        pointPaint.strokeCap = Paint.Cap.ROUND
     }
 
     override fun draw(canvas: Canvas) {
         super.draw(canvas)
         results?.let { poseLandmarkerResult ->
             for(landmark in poseLandmarkerResult.landmarks()) {
-                for(normalizedLandmark in landmark) {
-                    canvas.drawPoint(
-                        normalizedLandmark.x() * imageWidth * scaleFactor,
-                        normalizedLandmark.y() * imageHeight * scaleFactor,
-                        pointPaint
-                    )
-                }
 
                 PoseLandmarker.POSE_LANDMARKS.forEach {
                     canvas.drawLine(
@@ -65,6 +59,14 @@ class OverlayView(context: Context?, attrs: AttributeSet? = null) :
                         poseLandmarkerResult.landmarks().get(0).get(it.end()).x() * imageWidth * scaleFactor,
                         poseLandmarkerResult.landmarks().get(0).get(it.end()).y() * imageHeight * scaleFactor,
                         linePaint)
+                }
+
+                for(normalizedLandmark in landmark) {
+                    canvas.drawPoint(
+                        normalizedLandmark.x() * imageWidth * scaleFactor,
+                        normalizedLandmark.y() * imageHeight * scaleFactor,
+                        pointPaint
+                    )
                 }
             }
         }
@@ -87,16 +89,9 @@ class OverlayView(context: Context?, attrs: AttributeSet? = null) :
                 min(width * 1f / imageWidth, height * 1f / imageHeight)
             }
             RunningMode.LIVE_STREAM -> {
-                // PreviewView is in FILL_START mode. So we need to scale up the
-                // landmarks to match with the size that the captured images will be
-                // displayed.
                 max(width * 1f / imageWidth, height * 1f / imageHeight)
             }
         }
         invalidate()
-    }
-
-    companion object {
-        private const val LANDMARK_STROKE_WIDTH = 8F // Ajustado un poco más fino
     }
 }

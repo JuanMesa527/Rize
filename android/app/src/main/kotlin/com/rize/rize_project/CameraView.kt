@@ -32,6 +32,9 @@ class CameraView(
     private var preview: Preview? = null
     private var cameraInput: androidx.camera.core.Camera? = null
 
+    Variable para rastrear la cámara actual (empieza con la trasera)
+    private var lensFacing: Int = CameraSelector.LENS_FACING_BACK
+
     private lateinit var poseLandmarkerHelper: PoseLandmarkerHelper
     private val backgroundExecutor = Executors.newSingleThreadExecutor()
 
@@ -47,7 +50,7 @@ class CameraView(
         overlayView.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
 
         frameLayout.addView(previewView)
-        frameLayout.addView(overlayView) // Agregar overlay encima de preview
+        frameLayout.addView(overlayView)
 
         setupMediaPipe()
 
@@ -63,6 +66,15 @@ class CameraView(
         )
     }
 
+    fun switchCamera() {
+        lensFacing = if (lensFacing == CameraSelector.LENS_FACING_FRONT) {
+            CameraSelector.LENS_FACING_BACK
+        } else {
+            CameraSelector.LENS_FACING_FRONT
+        }
+        bindCameraUseCases()
+    }
+
     private fun setupCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
         cameraProviderFuture.addListener({
@@ -74,7 +86,10 @@ class CameraView(
     private fun bindCameraUseCases() {
         val cameraProvider = cameraProvider ?: return
 
-        val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
+        preview?.setSurfaceProvider(null)
+        cameraProvider.unbindAll()
+
+        val cameraSelector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
 
         preview = Preview.Builder()
             .setTargetAspectRatio(AspectRatio.RATIO_4_3)
@@ -91,18 +106,14 @@ class CameraView(
                 it.setAnalyzer(backgroundExecutor) { image ->
                     poseLandmarkerHelper.detectLiveStream(
                         imageProxy = image,
-                        isFrontCamera = true // Assuming front camera
+                        isFrontCamera = lensFacing == CameraSelector.LENS_FACING_FRONT
                     )
                 }
             }
 
-        cameraProvider.unbindAll()
 
         try {
-            // Must unbind the use-cases before rebinding them
-           // cameraProvider.unbindAll()
-
-            cameraInput = cameraProvider.bindToLifecycle(
+            cameraProvider.bindToLifecycle(
                 lifecycleOwner,
                 cameraSelector,
                 preview,
@@ -129,7 +140,6 @@ class CameraView(
     }
 
     override fun onResults(resultBundle: ResultBundle) {
-        // Ejecutar en Main Thread para actualizar UI (Overlay)
         ContextCompat.getMainExecutor(context).execute {
             overlayView.setResults(
                 resultBundle.results.first(),
@@ -143,7 +153,6 @@ class CameraView(
         if (results.isNotEmpty()) {
             val firstResult = results[0]
             val landmarks = firstResult.landmarks()
-            // landmarks is a list of list of normalized landmarks (one list per person)
 
             if (landmarks.isNotEmpty()) {
                 val personLandmarks = landmarks[0]
